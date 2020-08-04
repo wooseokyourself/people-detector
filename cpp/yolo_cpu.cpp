@@ -69,7 +69,7 @@ int postProcess (Mat& frame, const vector<Mat>& outs, Net& net, float confThresh
         CV_Error(Error::StsNotImplemented, "Unknown output layer type: " + outLayerType);
 
     vector<int> indices;
-    NMSBoxes(boxes, confidences, this->confThreshold, this->nmsThreshold, indices);
+    NMSBoxes(boxes, confidences, confThreshold, nmsThreshold, indices);
     for (size_t i = 0; i < indices.size(); ++i) {   
         int idx = indices[i];
         if (classIds[idx] == 0) { // Draw rectangle if class is a person.
@@ -124,23 +124,25 @@ int doInference (string INPUT_IMAGE_PATH, int resize) {
 //Mark: Pre-process
     imagePadding(frame);
     static Mat blob = blobFromImage(frame, 
-                                    double scalarfactor=1, 
-                                    Size resizeRes=Size(resize, resize), 
+                                    1, // scalarfactor: double
+                                    Size(resize, resize), // resizeRes: Size
                                     Scalar(), 
-                                    bool swapRB=true, 
+                                    true, // swapRB: bool
                                     false, 
                                     CV_8U);
 
     net.setInput(blob,
                  "", 
-                 double scale=1/255.0, 
-                 Scalar mean=Scalar());
+                 1/255.0, // scale: double
+                 Scalar()); // mean: Scalar
 
 //Mark: Go inference
     net.forward(outs, outNames);
 
 //Mark: Post-process
-    int peopleNum = postProcess(frame, outs, net, float confThreshold=0.4, float nmsThreshold=0.5);
+    float confThreshold = 0.4;
+    float nmsThreshold = 0.5;
+    int peopleNum = postProcess(frame, outs, net, confThreshold, nmsThreshold);
 
 //Mark: Draw rect and other info in output image.
     vector<double> layersTimes;
