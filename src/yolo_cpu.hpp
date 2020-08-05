@@ -18,7 +18,7 @@ using namespace std;
 using namespace cv;
 using namespace dnn;
 
-class Yolo_cpu: public Napi::ObjectWrap<Yolo_cpu> {
+class Yolo_cpu : public Napi::ObjectWrap<Yolo_cpu> {
     private:
         string MODEL_PATH;
         string CFG_PATH;
@@ -30,7 +30,7 @@ class Yolo_cpu: public Napi::ObjectWrap<Yolo_cpu> {
         
     public:
         static Napi::Object Init(Napi::Env env, Napi::Object exports);
-        Yolo_cpu(const Napi::CallbackInfo& info);
+        Yolo_cpu();
     
     protected:
         Napi::Value start(const Napi::CallbackInfo& info);
