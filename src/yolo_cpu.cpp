@@ -15,9 +15,9 @@ Napi::Object Yolo_cpu::Init(Napi::Env env, Napi::Object exports) {
 }
 
 Yolo_cpu::Yolo_cpu(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Yolo_cpu>(info) {
-    this->MODEL_PATH = "../bin/model/yolov3.weights";
-    this->CFG_PATH = "../bin/model/yolov3.cfg";
-    this->CLASSES_PATH = "../bin/model/coco.names";
+    this->MODEL_PATH = "bin/model/yolov3.weights";
+    this->CFG_PATH = "bin/model/yolov3.cfg";
+    this->CLASSES_PATH = "bin/model/coco.names";
 
     this->confThreshold = 0.4;
     this->nmsThreshold = 0.5;
