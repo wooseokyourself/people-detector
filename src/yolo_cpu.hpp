@@ -30,7 +30,7 @@ class Yolo_cpu : public Napi::ObjectWrap<Yolo_cpu> {
         
     public:
         static Napi::Object Init(Napi::Env env, Napi::Object exports);
-        Yolo_cpu();
+        Yolo_cpu(const Napi::CallbackInfo& info);
     
     protected:
         Napi::Value start(const Napi::CallbackInfo& info);
