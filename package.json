@@ -2,7 +2,7 @@
     "name": "people-detector",
     "version": "0.0.0",
     "description": "people-detector",
-    "main": "addon.js",
+    "main": "test.js",
     "private": true,
     "gypfile": true,
     "engines": {
