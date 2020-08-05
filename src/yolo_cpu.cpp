@@ -1,6 +1,92 @@
 #include "yolo_cpu.hpp"
 
-int postProcess (Mat& frame, const vector<Mat>& outs, Net& net, float confThreshold, float nmsThreshold) {
+Napi::Object Yolo_cpu::Init(Napi::Env env, Napi::Object exports) {
+    Napi::Function func =
+        DefineClass(env,
+                    "Yolo_cpu",
+                    {InstanceMethod("start", &Yolo_cpu::start)});
+
+    Napi::FunctionReference* constructor = new Napi::FunctionReference();
+    *constructor = Napi::Persistent(func);
+    env.SetInstanceData(constructor);
+
+    exports.Set("Yolo_cpu", func);
+    return exports;
+}
+
+Yolo_cpu::Yolo_cpu() {
+    this->MODEL_PATH = "../bin/model/yolov3.weights";
+    this->CFG_PATH = "../bin/model/yolov3.cfg";
+    this->CLASSES_PATH = "../bin/model/coco.names";
+
+    this->confThreshold = 0.4;
+    this->nmsThreshold = 0.5;
+
+    this->net = readNet(MODEL_PATH, CFG_PATH);
+    this->net.setPreferableBackend(DNN_BACKEND_OPENCV);
+    this->net.setPreferableTarget(DNN_TARGET_CPU);
+    this->outNames = net.getUnconnectedOutLayersNames();
+}
+
+Napi::Value Yolo_cpu::start(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2) {
+        Napi::TypeError::New(env, "Wrong number of arguments").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+    if (!info[0].IsString() || !info[1].IsNumber()) {
+        Napi::TypeError::New(env, "Wrong arguments").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+    string arg0 = info[0].As<Napi::String>().Utf8Value();
+    int arg1 = info[1].As<Napi::Number>().Int32Value();
+    
+    int result = this->doInference(arg0, arg1);
+
+    Napi::Number ret = Napi::Number::New(env, result);
+    return ret;
+}
+
+int Yolo_cpu::doInference(const string imagePath, const int resize) {
+    Mat frame = imread(imagePath, IMREAD_COLOR); 
+    vector<Mat> outs;
+    
+//Mark: Pre-process
+    imagePadding(frame);
+    static Mat blob = blobFromImage(frame, 
+                                    1, // scalarfactor: double
+                                    Size(resize, resize), // resizeRes: Size
+                                    Scalar(), 
+                                    true, // swapRB: bool
+                                    false, 
+                                    CV_8U);
+
+    net.setInput(blob,
+                 "", 
+                 1/255.0, // scale: double
+                 Scalar()); // mean: Scalar
+
+//Mark: Go inference
+    net.forward(outs, outNames);
+
+//Mark: Post-process
+    
+    int peopleNum = postProcess(frame, outs);
+
+//Mark: Draw rect and other info in output image.
+    vector<double> layersTimes;
+    double freq = getTickFrequency() / 1000;
+    double t = net.getPerfProfile(layersTimes) / freq;
+    
+    string labelInferTime = format ("Inference time: %.2f ms", t);
+    string labelPeople = format ("People: %d", peopleNum);
+    putText (frame, labelInferTime, Point(0, 35), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255), 2);
+    putText (frame, labelPeople, Point(0, 70), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255), 2);
+
+    return peopleNum;
+}
+
+int Yolo_cpu::postProcess(Mat& frame, const vector<Mat>& outs) {
     int people = 0;
     static vector<int> outLayers = net.getUnconnectedOutLayers();
     static string outLayerType = net.getLayer(outLayers[0])->type;
@@ -85,7 +171,7 @@ int postProcess (Mat& frame, const vector<Mat>& outs, Net& net, float confThresh
     return people;
 }
 
-void imagePadding (Mat& frame) {
+void Yolo_cpu::imagePadding(Mat& frame) {
     if (frame.rows == frame.cols)
         return;
 
@@ -98,61 +184,4 @@ void imagePadding (Mat& frame) {
         Mat pad (length - frame.rows, length, frame.type(), Scalar(255, 255, 255));
         vconcat (pad, frame, frame);
     }
-}
-
-int doInference (string INPUT_IMAGE_PATH, int resize) {
-
-//Mark: Init function; Same in every call
-    string MODEL_PATH = "";
-    string CFG_PATH = "";
-    string CLASSES_PATH = "";
-
-    vector< vector<int> > overlaps;
-
-    vector<string> classes;
-    
-    Net net = readNet(MODEL_PATH, CFG_PATH);
-    net.setPreferableBackend(DNN_BACKEND_OPENCV);
-    net.setPreferableTarget(DNN_TARGET_CPU);
-    vector<cv::String> outNames = net.getUnconnectedOutLayersNames();
-
-
-//Mark: Below shoud be executed in every call.
-    Mat frame = imread(INPUT_IMAGE_PATH, CV_COLOR); // 수정필요
-    vector<Mat> outs;
-    
-//Mark: Pre-process
-    imagePadding(frame);
-    static Mat blob = blobFromImage(frame, 
-                                    1, // scalarfactor: double
-                                    Size(resize, resize), // resizeRes: Size
-                                    Scalar(), 
-                                    true, // swapRB: bool
-                                    false, 
-                                    CV_8U);
-
-    net.setInput(blob,
-                 "", 
-                 1/255.0, // scale: double
-                 Scalar()); // mean: Scalar
-
-//Mark: Go inference
-    net.forward(outs, outNames);
-
-//Mark: Post-process
-    float confThreshold = 0.4;
-    float nmsThreshold = 0.5;
-    int peopleNum = postProcess(frame, outs, net, confThreshold, nmsThreshold);
-
-//Mark: Draw rect and other info in output image.
-    vector<double> layersTimes;
-    double freq = getTickFrequency() / 1000;
-    double t = net.getPerfProfile(layersTimes) / freq;
-    
-    string labelInferTime = format ("Inference time: %.2f ms", t);
-    string labelPeople = format ("People: %d", peopleNum);
-    putText (frame, labelInferTime, Point(0, 35), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255), 2);
-    putText (frame, labelPeople, Point(0, 70), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255), 2);
-
-    return peopleNum;
 }
