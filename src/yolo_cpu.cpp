@@ -40,7 +40,7 @@ Napi::Value Yolo_cpu::start(const Napi::CallbackInfo& info) {
     }
     string arg0 = info[0].As<Napi::String>().Utf8Value();
     string arg1 = info[1].As<Napi::String>().Utf8Value();
-    int arg2 = info[1].As<Napi::Number>().Int32Value();
+    int arg2 = info[2].As<Napi::Number>().Int32Value();
     
     int result = this->doInference(arg0, arg1, arg2);
 
