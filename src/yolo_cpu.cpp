@@ -1,10 +1,7 @@
 #include "yolo_cpu.hpp"
 
 Napi::Object Yolo_cpu::Init(Napi::Env env, Napi::Object exports) {
-    Napi::Function func =
-        DefineClass(env,
-                    "Yolo_cpu",
-                    {InstanceMethod("start", &Yolo_cpu::start)});
+    Napi::Function func = DefineClass(env, "Yolo_cpu", {InstanceMethod("start", &Yolo_cpu::start)});
 
     Napi::FunctionReference* constructor = new Napi::FunctionReference();
     *constructor = Napi::Persistent(func);
@@ -80,18 +77,33 @@ int Yolo_cpu::doInference(const string inputImagePath, const string outputImageP
 }
 
 void Yolo_cpu::preProcess(Mat& frame, const int& cameID, const string& roiInfo) {
+    /**
+     * roiInfo에 담긴 데이터는 frame 이 640X480 일 때를 기준으로 생성된 것이므로,
+     * 이 데이터를 현재 frame의 해상도에 맞게 변환해주어야함
+    */
     //Mark: remove roi image
+    int originW = frame.cols;
+    int originH = frame.rows;
+
     Json::Reader reader;
     Json::Value root;
     reader.parse(roiInfo, root);
-    Json::Value infoArray = root[/** 배열의 이름*/];
+    Json::Value infoArray = root["data"];
     for (int i=0; i<infoArray.size(); i++) {
         if (infoArray[i]["id"].asInt() == camID) {
-            int leftTopX = infoArray[i]["leftTopX"].asInt();
-            int leftTopY = infoArray[i]["leftTopY"].asInt();
-            int rightBottomX = infoArray[i]["rightBottomX"].asInt();
-            int rightBottomY = infoArray[i]["rightBottomY"].asInt();
-            rectangle(frame, Point(leftTopX, leftTopY), Point(rightBottomX, rightBottomY), Scalar(255, 255, 255), FILLED);
+            // 640X480 기준 좌표
+            int leftTopX = infoArray[i]["leftX"].asInt();
+            int leftTopY = infoArray[i]["leftY"].asInt();
+            int rightBottomX = leftTopX + infoArray[i]["width"].asInt();
+            int rightBottomY = leftTopY + infoArray[i]["height"].asInt();
+
+            // 원본 해상도 기준 좌표
+            int originLeftTopX = (leftTopX * originW) / 640;
+            int originLeftTopY = (leftTopY * originH) / 480;
+            int originRightBottomX = (rightBottomX * originW) / 640;
+            int originRightBottomY = (rightBottomY * originW) / 480;
+            
+            rectangle(frame, Point(originLeftTopX, originLeftTopY), Point(originRightBottomX, originRightBottomY), Scalar(255, 255, 255), FILLED);
         }
     }
 
