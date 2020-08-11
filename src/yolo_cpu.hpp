@@ -13,7 +13,7 @@
 #include <opencv2/imgcodecs.hpp>
 
 #include <napi.h>
-#include "json/json.h"
+#include <jsoncpp/json/json.h>
 
 using namespace std;
 using namespace cv;
@@ -40,7 +40,7 @@ class Yolo_cpu : public Napi::ObjectWrap<Yolo_cpu> {
         int doInference(const string inputImagePath, const string outputImagePath, const int resize, const string roiInfo);
 
     private:
-        int preProcess(Mat& frame, const int& camID, const string& roiInfo);
+        void preProcess(Mat& frame, const int& camID, const int& resize, const string& roiInfo);
         int postProcess(Mat& frame, const vector<Mat>& outs);
 };
 
