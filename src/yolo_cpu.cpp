@@ -15,9 +15,9 @@ Napi::Object Yolo_cpu::Init(Napi::Env env, Napi::Object exports) {
 }
 
 Yolo_cpu::Yolo_cpu(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Yolo_cpu>(info) {
-    this->MODEL_PATH = "bin/model/yolov3.weights";
-    this->CFG_PATH = "bin/model/yolov3.cfg";
-    this->CLASSES_PATH = "bin/model/coco.names";
+    this->MODEL_PATH = "resources/cpp/bin/model/yolov3.weights";
+    this->CFG_PATH = "resources/cpp/bin/model/yolov3.cfg";
+    this->CLASSES_PATH = "resources/cpp/bin/model/coco.names";
 
     this->confThreshold = 0.4;
     this->nmsThreshold = 0.5;
@@ -27,6 +27,7 @@ Yolo_cpu::Yolo_cpu(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Yolo_cpu>(
     this->net.setPreferableTarget(DNN_TARGET_CPU);
     this->outNames = net.getUnconnectedOutLayersNames();
 }
+
 Napi::Value Yolo_cpu::start(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 3) {
@@ -40,28 +41,37 @@ Napi::Value Yolo_cpu::start(const Napi::CallbackInfo& info) {
     string arg0 = info[0].As<Napi::String>().Utf8Value();
     string arg1 = info[1].As<Napi::String>().Utf8Value();
     int arg2 = info[2].As<Napi::Number>().Int32Value();
-    string arg3 = " ";
-    if (info.Length() == 4)
-        arg3 = info[3].As<Napi::String>().Utf8Value();
     
-    int result = this->doInference(arg0, arg1, arg2, arg3);
+    int result = this->doInference(arg0, arg1, arg2);
 
     Napi::Number ret = Napi::Number::New(env, result);
     return ret;
 }
 
-int Yolo_cpu::doInference(const string inputImagePath, const string outputImagePath, const int resize, const string roiInfo) {
+int Yolo_cpu::doInference(const string inputImagePath, const string outputImagePath, const int resize) {
     Mat frame = imread(inputImagePath, IMREAD_COLOR); 
     vector<Mat> outs;
-    int camID = inputImagePath[inputImagePath.size()-6]; // "...$(ID).jpeg"
-
+    
 //Mark: Pre-process
-    preProcess(frame, camID, resize, roiInfo);
+    imagePadding(frame);
+    static Mat blob = blobFromImage(frame, 
+                                    1, // scalarfactor: double
+                                    Size(resize, resize), // resizeRes: Size
+                                    Scalar(), 
+                                    true, // swapRB: bool
+                                    false, 
+                                    CV_8U);
+
+    net.setInput(blob,
+                 "", 
+                 1/255.0, // scale: double
+                 Scalar()); // mean: Scalar
 
 //Mark: Go inference
     net.forward(outs, outNames);
 
 //Mark: Post-process
+    
     int peopleNum = postProcess(frame, outs);
 
 //Mark: Draw rect and other info in output image.
@@ -76,66 +86,6 @@ int Yolo_cpu::doInference(const string inputImagePath, const string outputImageP
 
     imwrite(outputImagePath, frame);
     return peopleNum;
-}
-
-void Yolo_cpu::preProcess(Mat& frame, const int& camID, const int& resize, const string& roiInfo) {
-    /**
-     * roiInfo에 담긴 데이터는 frame 이 640X480 일 때를 기준으로 생성된 것이므로,
-     * 이 데이터를 현재 frame의 해상도에 맞게 변환해주어야함
-    */
-    //Mark: remove roi image
-    int originW = frame.cols;
-    int originH = frame.rows;
-
-    Json::Reader reader;
-    Json::Value root;
-    reader.parse(roiInfo, root);
-    Json::Value infoArray = root["data"];
-    for (int i=0; i<infoArray.size(); i++) {
-        if (infoArray[i]["id"].asInt() == camID) {
-            // 640X480 기준 좌표
-            int leftTopX = infoArray[i]["leftX"].asInt();
-            int leftTopY = infoArray[i]["leftY"].asInt();
-            int rightBottomX = leftTopX + infoArray[i]["width"].asInt();
-            int rightBottomY = leftTopY + infoArray[i]["height"].asInt();
-
-            // 원본 해상도 기준 좌표
-            int originLeftTopX = (leftTopX * originW) / 640;
-            int originLeftTopY = (leftTopY * originH) / 480;
-            int originRightBottomX = (rightBottomX * originW) / 640;
-            int originRightBottomY = (rightBottomY * originW) / 480;
-            
-            rectangle(frame, Point(originLeftTopX, originLeftTopY), Point(originRightBottomX, originRightBottomY), Scalar(255, 255, 255), FILLED);
-        }
-    }
-
-    //Mark: Image padding
-    if (frame.rows == frame.cols)
-        return;
-
-    int length = frame.cols > frame.rows ? frame.cols : frame.rows;
-    if (frame.cols < length) {
-        Mat pad(length, length - frame.cols, frame.type(), Scalar(255, 255, 255));
-        hconcat(pad, frame, frame);
-    }
-    else {
-        Mat pad(length - frame.rows, length, frame.type(), Scalar(255, 255, 255));
-        vconcat(pad, frame, frame);
-    }
-
-    //Mark: Prepare for inference
-    static Mat blob = blobFromImage(frame, 
-                                    1, // scalarfactor: double
-                                    Size(resize, resize), // resizeRes: Size
-                                    Scalar(), 
-                                    true, // swapRB: bool
-                                    false, 
-                                    CV_8U);
-
-    net.setInput(blob,
-                 "", 
-                 1/255.0, // scale: double
-                 Scalar()); // mean: Scalar
 }
 
 int Yolo_cpu::postProcess(Mat& frame, const vector<Mat>& outs) {
@@ -221,4 +171,19 @@ int Yolo_cpu::postProcess(Mat& frame, const vector<Mat>& outs) {
         }
     }
     return people;
+}
+
+void Yolo_cpu::imagePadding(Mat& frame) {
+    if (frame.rows == frame.cols)
+        return;
+
+    int length = frame.cols > frame.rows ? frame.cols : frame.rows;
+    if (frame.cols < length) {
+        Mat pad (length, length - frame.cols, frame.type(), Scalar(255, 255, 255));
+        hconcat (pad, frame, frame);
+    }
+    else {
+        Mat pad (length - frame.rows, length, frame.type(), Scalar(255, 255, 255));
+        vconcat (pad, frame, frame);
+    }
 }
