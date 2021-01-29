@@ -1,5 +1,5 @@
 # people-detector
-Module for node.js, based on OpenCV DNN with cpu, YOLO and COCO dataset.
+Module for node.js, based on OpenCV DNN, YOLOv3 and COCO dataset.
 
 # Dependencies
 - Linux
@@ -39,3 +39,6 @@ $ sh getModel.sh
 
 # Usage
 see ```test.js```. It returns the number of people in image and write result image.
+
+# Others
++ If you want to use model of yolov4, then OpenCV 4.4 or later version is required.
