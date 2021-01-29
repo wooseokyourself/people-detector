@@ -1,5 +1,5 @@
 # people-detector
-Module for node.js, based on OpenCV DNN, YOLO and COCO dataset.
+Module for node.js, based on OpenCV DNN with cpu, YOLO and COCO dataset.
 
 # Dependencies
 - Linux
