@@ -3,7 +3,7 @@ Module for node.js, based on OpenCV DNN, YOLO and COCO dataset.
 
 # Dependencies
 - Linux
-- OpenCV 4.1.3 >= (with pkgconfig)
+- OpenCV 4 (with pkgconfig)
 - node-gyp
 
 # Install
