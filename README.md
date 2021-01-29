@@ -33,6 +33,7 @@ $ node-gyp build
 
 5. Get YOLOv3 pre-trained model
 ~~~
+$ chmod 755 getModel.sh
 $ sh getModel.sh
 ~~~
 
