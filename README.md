@@ -37,3 +37,5 @@ $ chmod 755 getModel.sh
 $ sh getModel.sh
 ~~~
 
+# Usage
+see ```test.js```. It returns the number of people in image and write result image.
